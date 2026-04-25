@@ -480,6 +480,21 @@ height:80px;
 ما عندك حساب؟
 <span onclick="openRegister()">إنشاء حساب جديد</span>
 </div>
+<div class="auth-link" style="margin-top:10px;border-top:1px solid #ddd;padding-top:10px;">
+<span onclick="openForgotPassword()">🔑 نسيت كلمة السر؟</span>
+</div>
+</div>
+</div>
+
+<div id="forgotPasswordPage" class="auth-container" style="display:none;">
+<div class="auth-box">
+<h2>🔐 استعادة كلمة السر</h2>
+<p style="text-align:center;color:#666;margin-bottom:15px;font-size:14px;">سيتم إرسال رابط استعادة كلمة السر إلى بريدك الإلكتروني</p>
+<input id="forgotEmail" type="email" placeholder="ادخل ايميلك المسجل">
+<button id="forgotBtn" onclick="window.sendResetEmail()">إرسال رابط الاستعادة</button>
+<div class="auth-link" style="margin-top:10px;">
+<span onclick="goToLogin()">← رجوع للدخول</span>
+</div>
 </div>
 </div>
 
@@ -653,7 +668,7 @@ height:80px;
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, setPersistence, browserLocalPersistence, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js";
 import { getDatabase, ref, set, get, update } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-database.js";
 
 // ⚠️ تحذير أمني: استخدم متغيرات البيئة في الإنتاج
@@ -695,6 +710,58 @@ const apps=[{name:"يا أهلا",img:"https://i.ibb.co/G307spDQ/image.png",pack
 
 let selectedApp="",selectedPrice=0,selectedAmount=0,currentUser=null;
 
+window.openForgotPassword = function(){
+  document.getElementById("loginPage").style.display="none";
+  document.getElementById("forgotPasswordPage").style.display="flex";
+  document.getElementById("forgotEmail").value="";
+};
+
+window.sendResetEmail = async function(){
+  let email = document.getElementById("forgotEmail").value.trim();
+  
+  if(!email){
+    alert("❌ ادخل الإيميل المسجل");
+    return;
+  }
+  
+  let forgotBtn = document.getElementById("forgotBtn");
+  let originalText = forgotBtn.innerText;
+  forgotBtn.innerText = "⏳ جاري الإرسال...";
+  forgotBtn.disabled = true;
+  
+  try {
+    console.log("🔄 جاري إرسال رابط الاستعادة للإيميل:", email);
+    
+    await sendPasswordResetEmail(auth, email);
+    
+    console.log("✅ تم إرسال رابط الاستعادة");
+    alert("✅ تم إرسال رابط استعادة كلمة السر إلى بريدك الإلكتروني\n\nتحقق من البريد (وقد يكون في الرسائل العشوائية)");
+    
+    document.getElementById("forgotEmail").value = "";
+    window.goToLogin();
+    
+  } catch(error) {
+    console.error("❌ خطأ الإرسال:", error.code, error.message);
+    
+    let errorMessage = "❌ ";
+    
+    if(error.code === "auth/user-not-found"){
+      errorMessage = "❌ هذا الإيميل لم يتم تسجيله";
+    } else if(error.code === "auth/invalid-email"){
+      errorMessage = "❌ صيغة الإيميل غير صحيحة";
+    } else if(error.code === "auth/network-request-failed"){
+      errorMessage = "❌ خطأ في الاتصال - تحقق من الإنترنت";
+    } else {
+      errorMessage = "❌ " + error.message;
+    }
+    
+    alert(errorMessage);
+  } finally {
+    forgotBtn.innerText = originalText;
+    forgotBtn.disabled = false;
+  }
+};
+
 window.convertCurrency = function(type){
   let amount = 0;
   let resultSpan = '';
@@ -721,6 +788,7 @@ window.openRegister = function(){
 
 window.goToLogin = function(){
   document.getElementById("registerPage").style.display="none";
+  document.getElementById("forgotPasswordPage").style.display="none";
   document.getElementById("loginPage").style.display="flex";
 };
 
@@ -1344,4 +1412,5 @@ document.addEventListener('DOMContentLoaded', function(){
 </script>
 
 </body>
-  </html>
+</html>
+
