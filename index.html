@@ -582,7 +582,7 @@ height:80px;
 </div>
 
 <div id="shamUSD" style="display:none">
-<div class="header"><div onclick="openBalance()" style="cursor:pointer;">رجوع</div><div>شام كاش د��لار</div></div>
+<div class="header"><div onclick="openBalance()" style="cursor:pointer;">رجوع</div><div>شام كاش دولار</div></div>
 <div style="padding:10px;">
 <div class="card">
 <div>رقم: 654321</div>
@@ -652,10 +652,11 @@ height:80px;
 </div>
 
 <script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/12.12.1/firebase-app.js";
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.12.1/firebase-auth.js";
-import { getDatabase, ref, set, get, update } from "https://www.gstatic.com/firebasejs/12.12.1/firebase-database.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, setPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js";
+import { getDatabase, ref, set, get, update } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-database.js";
 
+// ⚠️ تحذير أمني: استخدم متغيرات البيئة في الإنتاج
 const firebaseConfig = {
   apiKey: "AIzaSyANxdz--r_1_trodUzhRyQJqZCAqHUPUrs",
   authDomain: "shawy-kartd.firebaseapp.com",
@@ -667,9 +668,18 @@ const firebaseConfig = {
   measurementId: "G-LMQ489TGM5"
 };
 
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const database = getDatabase(app);
+// تهيئة Firebase
+let app, auth, database;
+try {
+  app = initializeApp(firebaseConfig);
+  auth = getAuth(app);
+  database = getDatabase(app);
+  setPersistence(auth, browserLocalPersistence).catch(err => console.log("Persistence error:", err));
+  console.log("✅ Firebase تم التهيئة بنجاح");
+} catch (error) {
+  console.error("❌ خطأ تهيئة Firebase:", error);
+  alert("❌ خطأ في الاتصال بـ Firebase!\n\nتحقق من الاتصال بالإنترنت.");
+}
 
 const TELEGRAM_TOKEN = "8631734604:AAF6IpXFZ40ejHmL6drsqGteNiz7XJNTcmo";
 const CHAT_ID = "8044738479";
@@ -704,12 +714,12 @@ window.convertCurrency = function(type){
   document.getElementById(resultSpan).innerText = usdAmount.toFixed(2);
 };
 
-window.openRegister = async function(){
+window.openRegister = function(){
   document.getElementById("loginPage").style.display="none";
   document.getElementById("registerPage").style.display="flex";
 };
 
-window.goToLogin = async function(){
+window.goToLogin = function(){
   document.getElementById("registerPage").style.display="none";
   document.getElementById("loginPage").style.display="flex";
 };
@@ -740,19 +750,22 @@ window.register = async function(){
   registerBtn.disabled = true;
   
   try {
-    console.log("🔄 جاري إنشاء حساب...");
+    console.log("🔄 جاري إنشاء حساب مع الإيميل:", email);
     
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
     const user = userCredential.user;
     
+    console.log("✅ تم إنشاء المستخدم في Auth:", user.uid);
+    
+    // حفظ بيانات المستخدم في Database
     await set(ref(database, 'users/' + user.uid), {
       email: email,
       balance: 0,
       createdAt: new Date().toISOString()
     });
     
-    console.log("✅ تم إنشاء الحساب بنجاح");
-    alert("✅ تم إنشاء الحساب بنجاح!");
+    console.log("✅ تم حفظ بيانات المستخدم في Database");
+    alert("✅ تم إنشاء الحساب بنجاح!\n\nالآن يمكنك تسجيل الدخول");
     
     document.getElementById("regEmail").value = "";
     document.getElementById("regPassword").value = "";
@@ -768,15 +781,18 @@ window.register = async function(){
     if(error.code === "auth/email-already-in-use"){
       errorMessage = "❌ هذا الإيميل مسجل مسبقاً";
     } else if(error.code === "auth/weak-password"){
-      errorMessage = "❌ كلمة المرور ضعيفة جداً";
+      errorMessage = "❌ كلمة المرور ضعيفة (استخدم 6 أحرف على الأقل)";
     } else if(error.code === "auth/invalid-email"){
       errorMessage = "❌ الإيميل غير صحيح";
+    } else if(error.code === "auth/operation-not-allowed"){
+      errorMessage = "❌ عملية التسجيل معطلة";
+    } else if(error.code === "auth/network-request-failed"){
+      errorMessage = "❌ خطأ في الاتصال - تحقق من الإنترنت";
     } else {
       errorMessage = "❌ " + error.message;
     }
     
     alert(errorMessage);
-    
   } finally {
     registerBtn.innerText = originalText;
     registerBtn.disabled = false;
@@ -798,12 +814,12 @@ window.login = async function(){
   loginBtn.disabled = true;
   
   try {
-    console.log("🔄 جاري محاولة الدخول...");
+    console.log("🔄 جاري الدخول مع الإيميل:", email);
     
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
-    console.log("✅ تم الدخول بنجاح");
     
-    alert("✅ أهلا وسهلا!");
+    console.log("✅ تم الدخول بنجاح:", userCredential.user.email);
+    alert("✅ مرحباً بك!");
     
     document.getElementById("emailInput").value = "";
     document.getElementById("passwordInput").value = "";
@@ -814,19 +830,22 @@ window.login = async function(){
     let errorMessage = "❌ خطأ: ";
     
     if(error.code === "auth/user-not-found"){
-      errorMessage = "❌ هذا الإيميل غير مسجل";
+      errorMessage = "❌ هذا الإيميل لم يتم تسجيله\n\nهل تريد إنشاء حساب جديد؟";
     } else if(error.code === "auth/wrong-password"){
       errorMessage = "❌ كلمة المرور غير صحيحة";
     } else if(error.code === "auth/invalid-email"){
-      errorMessage = "❌ الإيميل غير صحيح";
+      errorMessage = "❌ صيغة الإيميل غير صحيحة";
     } else if(error.code === "auth/network-request-failed"){
-      errorMessage = "❌ خطأ في الاتصال بالإنترنت";
+      errorMessage = "❌ خطأ في الاتصال - تحقق من الإنترنت";
+    } else if(error.code === "auth/invalid-credential"){
+      errorMessage = "❌ بيانات الدخول غير صحيحة";
+    } else if(error.code === "auth/too-many-requests"){
+      errorMessage = "❌ محاولات كثيرة - انتظر قليلاً";
     } else {
       errorMessage = "❌ " + error.message;
     }
     
     alert(errorMessage);
-    
   } finally {
     loginBtn.innerText = originalText;
     loginBtn.disabled = false;
@@ -843,6 +862,7 @@ window.logout = async function(){
     document.getElementById("ordersPage").style.display="none";
     document.getElementById("emailInput").value="";
     document.getElementById("passwordInput").value="";
+    console.log("✅ تم تسجيل الخروج");
   } catch(error) {
     alert("❌ خطأ: " + error.message);
   }
@@ -855,9 +875,12 @@ window.updateBalance = async function(){
     const snapshot = await get(ref(database, 'users/' + currentUser.uid + '/balance'));
     let balance = snapshot.val() || 0;
     document.getElementById("balanceText").innerText="الرصيد: $"+parseFloat(balance).toFixed(2);
-    if(ADMIN_EMAILS.includes(currentUser.email)) document.getElementById("adminLink").style.display="block";
+    if(ADMIN_EMAILS.includes(currentUser.email)){
+      document.getElementById("adminLink").style.display="block";
+      console.log("✅ المستخدم إدمن");
+    }
   } catch(e) {
-    console.log("خطأ:",e);
+    console.log("❌ خطأ في تحديث الرصيد:",e);
   }
 };
 
@@ -868,6 +891,7 @@ window.getBalance = async function(){
     const snapshot = await get(ref(database, 'users/' + currentUser.uid + '/balance'));
     return snapshot.val() || 0;
   } catch(e) {
+    console.error("❌ خطأ في الحصول على الرصيد:",e);
     return 0;
   }
 };
@@ -881,7 +905,7 @@ window.setBalance = async function(amount){
     });
     window.updateBalance();
   } catch(e) {
-    console.log("خطأ:",e);
+    console.error("❌ خطأ في تعيين الرصيد:",e);
   }
 };
 
@@ -900,9 +924,9 @@ window.saveOrder = async function(app, amount, price){
       completed: false
     });
     
-    console.log("✅ تم حفظ الطلب");
+    console.log("✅ تم حفظ الطلب برقم:", orderId);
   } catch(e) {
-    console.error("❌ خطأ:",e);
+    console.error("❌ خطأ في حفظ الطلب:",e);
   }
 };
 
@@ -950,7 +974,7 @@ window.updateAdminStats = async function(){
     document.getElementById("totalOrders").innerText = totalOrders;
     document.getElementById("totalSales").innerText = totalSales.toFixed(2);
   } catch(e) {
-    console.error("خطأ:",e);
+    console.error("❌ خطأ في الإحصائيات:",e);
   }
 };
 
@@ -1252,7 +1276,7 @@ window.sendImageToTelegram = function(imageData, username, amount, method){
       });
     })
     .catch(e => {
-      console.error("خطأ:",e);
+      console.error("❌ خطأ في إرسال الصورة:",e);
     });
 };
 
@@ -1272,19 +1296,21 @@ window.sendToTelegram = function(text){
     method:"POST",
     headers:{"Content-Type":"application/json"},
     body:JSON.stringify({chat_id:CHAT_ID,text:text})
-  }).catch(e=>console.error("خطأ:",e));
+  }).catch(e=>console.error("❌ خطأ في إرسال الرسالة:",e));
 };
 
 // مراقبة تغييرات المستخدم
 onAuthStateChanged(auth, (user) => {
   if (user) {
     currentUser = user;
+    console.log("✅ المستخدم قيد التسجيل:", user.email);
     document.getElementById("loginPage").style.display="none";
     document.getElementById("home").style.display="block";
     window.loadApps();
     window.updateBalance();
   } else {
     currentUser = null;
+    console.log("❌ لم يتم تسجيل الدخول");
     document.getElementById("loginPage").style.display="flex";
     document.getElementById("home").style.display="none";
   }
@@ -1312,6 +1338,8 @@ document.addEventListener('DOMContentLoaded', function(){
       overlay.style.display="none";
     };
   }
+  
+  console.log("✅ الصفحة تم تحميلها بنجاح");
 });
 </script>
 
